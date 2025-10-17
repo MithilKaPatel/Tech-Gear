@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { CartContext } from '../../context/CartContext';
 
-export const ReviewStep = ({ shippingData, paymentData, onBack, onPlaceOrder }) => {
+export const ReviewStep = ({ shippingData, paymentData, onBack, onPlaceOrder, loading = false }) => {
   const { cartItems, cartTotal } = useContext(CartContext);
 
   const shipping = cartTotal > 100 ? 0 : 9.99;
@@ -87,9 +87,10 @@ export const ReviewStep = ({ shippingData, paymentData, onBack, onPlaceOrder }) 
 
       <button
         onClick={onPlaceOrder}
-        className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-green-700 transition-colors"
+        disabled={loading}
+        className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Place Order
+        {loading ? 'Placing Order...' : 'Place Order'}
       </button>
     </div>
   );

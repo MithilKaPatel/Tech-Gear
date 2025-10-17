@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 export const OrderSuccessPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { orderId, shippingData, total } = location.state || {};
+  const { orderId, orderNumber, shippingData, total } = location.state || {};
 
   useEffect(() => {
     if (!orderId) {
@@ -31,7 +31,7 @@ export const OrderSuccessPage = () => {
         <div className="flex justify-between mb-4">
           <div>
             <p className="text-sm text-gray-500">Order Number</p>
-            <p className="font-semibold">{orderId}</p>
+            <p className="font-semibold">{orderNumber || orderId}</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">Total Amount</p>
@@ -47,16 +47,16 @@ export const OrderSuccessPage = () => {
 
       <div className="flex gap-4 justify-center">
         <button
-          onClick={() => navigate('/products')}
+          onClick={() => navigate('/profile?tab=orders')}
           className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
         >
-          Continue Shopping
+          View Orders
         </button>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/products')}
           className="border border-gray-300 px-8 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
         >
-          Go to Home
+          Continue Shopping
         </button>
       </div>
     </div>
