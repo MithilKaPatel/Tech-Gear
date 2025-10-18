@@ -40,42 +40,52 @@ export const LoginModal = ({ isOpen, onClose, onSwitchToRegister }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-        <div className="flex justify-between items-center mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="w-full max-w-md p-8 mx-4 bg-white rounded-lg">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Login</h2>
-          <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded">
+          <button onClick={handleClose} className="p-2 rounded hover:bg-gray-100">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded mb-4 text-sm">
+          <div className="p-3 mb-4 text-sm text-red-600 rounded bg-red-50">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label htmlFor="login-email" className="block mb-1 text-sm font-medium">
+              Email
+            </label>
             <input
+              id="login-email"
+              name="email"
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full border rounded px-3 py-2"
+              className="w-full px-3 py-2 border rounded"
               placeholder="your@email.com"
+              autoComplete="email"
               disabled={loading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
+            <label htmlFor="login-password" className="block mb-1 text-sm font-medium">
+              Password
+            </label>
             <input
+              id="login-password"
+              name="password"
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full border rounded px-3 py-2"
+              className="w-full px-3 py-2 border rounded"
               placeholder="••••••••"
+              autoComplete="current-password"
               disabled={loading}
             />
           </div>
@@ -83,17 +93,17 @@ export const LoginModal = ({ isOpen, onClose, onSwitchToRegister }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="mt-6 text-sm text-center text-gray-600">
           Don't have an account?{' '}
           <button
             onClick={onSwitchToRegister}
-            className="text-blue-600 font-medium hover:underline"
+            className="font-medium text-blue-600 hover:underline"
           >
             Register
           </button>
