@@ -17,15 +17,15 @@ export const ProductCard = ({ product }) => {
 
   return (
     <Link to={`/products/${product.slug}`} className="block">
-      <div className="border rounded-lg p-4 hover:shadow-lg transition-shadow bg-white h-full flex flex-col">
+      <div className="flex flex-col h-full p-4 transition-shadow bg-white border rounded-lg hover:shadow-lg">
         <div className="relative mb-3">
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-48 object-cover rounded"
+            className="object-cover w-full h-48 rounded"
           />
           {discount > 0 && (
-            <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+            <span className="absolute px-2 py-1 text-xs font-bold text-white bg-red-500 rounded top-2 right-2">
               -{discount}%
             </span>
           )}
@@ -39,7 +39,7 @@ export const ProductCard = ({ product }) => {
         </div>
 
         <div className="flex items-center gap-1 mb-2">
-          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+          <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
           <span className="text-sm font-medium">{product.rating}</span>
           <span className="text-xs text-gray-500">({product.reviews})</span>
         </div>
@@ -61,7 +61,7 @@ export const ProductCard = ({ product }) => {
           <button
             onClick={handleAddToCart}
             disabled={product.stock === 0}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-white transition-colors bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <ShoppingCart className="w-4 h-4" />
             Add to Cart
