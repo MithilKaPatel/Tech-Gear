@@ -1,137 +1,146 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import supabase from "../lib/supabase";
+import { createContext, useState, useEffect } from 'react';
+import supabase from '/src/lib/supabase.js';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Load user and their profile info (from users table)
-  const loadProfile = async (userId) => {
+  useEffect(() => {
+    checkUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          loadUser(session.user.id);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Check active session when app loads
+  const checkUser = async () => {
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) throw error;
-      setUser(data);
-    } catch (error) {
-      console.error("Error loading profile:", error.message);
-    }
-  };
-
-  // Register new user (sign up + insert into users table)
-  const register = async (userData) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-      });
-
-      if (error) throw error;
-
-      const newUser = data.user;
-
-      if (newUser) {
-        // Insert the user record into your "users" table
-        const { error: insertError } = await supabase
-          .from("users")
-          .insert({
-            id: newUser.id,
-            full_name: userData.full_name || "", // ✅ matches your DB column
-            phone: userData.phone || "",
-            avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              userData.full_name || "User"
-            )}`,
-          });
-
-        if (insertError) throw insertError;
-
-        // Load user data into context
-        await loadProfile(newUser.id);
-        return { success: true };
+      if (session?.user) {
+        await loadUser(session.user.id);
       }
     } catch (error) {
-      console.error("Registration Error:", error.message);
-      return { success: false, error: error.message };
+      console.error('Error checking user:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Login existing user
+  // Load user profile from "profiles" table
+  const loadUser = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setUser(data);
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
+
+  // Login
   const login = async (email, password) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password
       });
 
       if (error) throw error;
+
       if (data.user) {
-        await loadProfile(data.user.id);
+        await loadUser(data.user.id);
+        return { success: true };
       }
-      return { success: true };
     } catch (error) {
-      console.error("Login Error:", error.message);
       return { success: false, error: error.message };
     }
   };
 
-  // Logout user
-  const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+  // Register (Auth + Profiles)
+  const register = async ({ full_name, email, password, phone }) => {
+    try {
+      // 1️⃣ Create user in Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name, phone } // store as user_metadata
+        }
+      });
+
+      if (error) throw error;
+
+      // 2️⃣ Insert profile row
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          full_name,                  // matches DB column
+          email,
+          phone,
+          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}`
+        });
+
+        if (profileError) throw profileError;
+
+        await loadUser(data.user.id);
+        return { success: true };
+      }
+
+      return { success: false, error: 'User creation failed' };
+    } catch (error) {
+      console.error('Registration Error:', error);
+      return { success: false, error: error.message };
+    }
   };
 
-  // Keep user session synced
-  useEffect(() => {
-    const fetchSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Session error:", error.message);
-        setLoading(false);
-        return;
-      }
-
-      const currentUser = data.session?.user;
-      if (currentUser) {
-        await loadProfile(currentUser.id);
-      }
-      setLoading(false);
-    };
-
-    fetchSession();
-
-    // Listen to auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setUser(null);
-      }
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
+  // Logout
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, register, login, logout }}
+      value={{
+        user,
+        isAuthenticated,
+        loading,
+        login,
+        register,
+        logout
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
-
-// Custom hook for consuming context
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return context;
 };
