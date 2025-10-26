@@ -1,143 +1,130 @@
-import { createContext, useState, useEffect } from 'react';
-import supabase from '/src/lib/supabase.js';
+// src/context/AuthContext.jsx
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkUser();
+    let mounted = true;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          loadUser(session.user.id);
-        } else {
-          setUser(null);
-          setIsAuthenticated(false);
+    // initialize current session / user
+    const init = async () => {
+      try {
+        const {
+          data: { session: currentSession },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) throw error;
+
+        if (mounted) {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+        if (mounted) {
+          setLoading(false);
         }
       }
-    );
+    };
+
+    init();
+
+    // subscribe to auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+    });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      mounted = false;
+      if (subscription) subscription.unsubscribe();
     };
   }, []);
 
-  // Check active session when app loads
-  const checkUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
+  // signUp: create auth user; do NOT insert `email` into profiles.
+  // If you want a profile row client-side (instead of trigger), we'll insert only id + metadata (no email).
+  const signUp = async ({ email, password, full_name = null, avatar_url = null }) => {
+    // sign up via supabase auth
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        // place metadata in raw_user_meta_data so the server trigger can read them:
+        data: { full_name, avatar_url },
+      },
+    });
+    if (error) throw error;
 
-      if (session?.user) {
-        await loadUser(session.user.id);
+    // If your DB uses a trigger on auth.users to create profiles, you don't need to insert the profile here.
+    // But if you want to ensure a profile exists immediately client-side (or your trigger isn't present),
+    // insert profile with id = newly created user id (do NOT include email column unless your table has it).
+    const userId = data.user?.id ?? null;
+    if (userId) {
+      try {
+        // Try to create a profile only if it doesn't exist.
+        await supabase
+          .from("profiles")
+          .upsert(
+            { id: userId, full_name: full_name ?? null, avatar_url: avatar_url ?? null },
+            { onConflict: "id", ignoreDuplicates: false }
+          );
+      } catch (err) {
+        // If you're using the trigger, this may conflict — just log it.
+        console.warn("Could not upsert profile (might be created by trigger):", err);
       }
-    } catch (error) {
-      console.error('Error checking user:', error);
-    } finally {
-      setLoading(false);
     }
+
+    return data;
   };
 
-  // Load user profile from "profiles" table
-  const loadUser = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setUser(data);
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.error('Error loading user:', error);
-    }
+  // signIn with email & password
+  const signIn = async ({ email, password }) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
   };
 
-  // Login
-  const login = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        await loadUser(data.user.id);
-        return { success: true };
-      }
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
+  // signOut
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    setUser(null);
+    setSession(null);
   };
 
-  // Register (Auth + Profiles)
-  const register = async ({ full_name, email, password, phone }) => {
-    try {
-      // 1️⃣ Create user in Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name, phone } // store as user_metadata
-        }
-      });
-
-      if (error) throw error;
-
-      // 2️⃣ Insert profile row
-      if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.user.id,
-          full_name,                  // matches DB column
-          email,
-          phone,
-          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}`
-        });
-
-        if (profileError) throw profileError;
-
-        await loadUser(data.user.id);
-        return { success: true };
-      }
-
-      return { success: false, error: 'User creation failed' };
-    } catch (error) {
-      console.error('Registration Error:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
-  // Logout
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
+  // helper: update profile fields in profiles table
+  const updateProfile = async (profile) => {
+    if (!user?.id) throw new Error("Not authenticated");
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(profile)
+      .eq("id", user.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated,
+        session,
         loading,
-        login,
-        register,
-        logout
+        signUp,
+        signIn,
+        signOut,
+        updateProfile,
       }}
     >
       {children}
