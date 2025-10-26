@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export const LoginModal = ({ isOpen, onClose, onSwitchToRegister }) => {
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,8 +21,8 @@ export const LoginModal = ({ isOpen, onClose, onSwitchToRegister }) => {
       return;
     }
 
-    const result = await login(formData.email, formData.password);
-
+    const result = await signIn(formData);
+    console.log(result)
     if (result.success) {
       onClose();
       setFormData({ email: '', password: '' });

@@ -10,7 +10,7 @@ import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderSuccessPage } from './pages/OrderSuccessPage';
 import { ProfilePage } from './pages/ProfilePage';
-import { supabase } from './lib/supabase';
+import {supabase} from './lib/supabase'
 
 function App() {
   return (

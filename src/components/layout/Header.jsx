@@ -13,7 +13,7 @@ import { CartContext } from '../../context/CartContext';
 import { CartDrawer } from '../cart/CartDrawer';
 import { useAuth } from '../../hooks/useAuth';
 import { LoginModal } from '../auth/LoginModal';
-import { RegisterModal } from '../auth/RegisterModal';
+import { RegisterModal } from "../auth/RegisterModal";
 import { SearchBar } from '../common/SearchBar';
 
 export const Header = () => {

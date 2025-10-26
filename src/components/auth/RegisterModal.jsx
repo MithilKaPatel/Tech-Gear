@@ -1,146 +1,250 @@
-// src/context/AuthContext.jsx
-import React, { createContext, useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import { useState } from "react";
+import { X } from "lucide-react";
+import { useAuth } from "../../hooks/useAuth";
 
-export const AuthContext = createContext();
+export const RegisterModal = ({ isOpen, onClose, onSwitchToLogin }) => {
+  const { signUp } = useAuth();
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+  });
 
-  useEffect(() => {
-    let mounted = true;
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
-    // Initialize session & user
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        if (mounted) {
-          setSession(data.session ?? null);
-          setUser(data.session?.user ?? null);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Auth init error:", err);
-        if (mounted) setLoading(false);
-      }
-    })();
+  if (!isOpen) return null;
 
-    // Subscribe to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-    });
+  // --- Validation ---
+  const validate = () => {
+    const newErrors = {};
 
-    return () => {
-      mounted = false;
-      if (subscription && typeof subscription.unsubscribe === "function") {
-        subscription.unsubscribe();
-      }
-    };
-  }, []);
+    if (!formData.name) newErrors.name = "Name is required";
+    if (!formData.email) newErrors.email = "Email is required";
+    if (!formData.password) newErrors.password = "Password is required";
+    if (formData.password.length < 6)
+      newErrors.password = "Password must be at least 6 characters";
+    if (formData.password !== formData.confirmPassword)
+      newErrors.confirmPassword = "Passwords do not match";
 
-  /**
-   * register - called by your RegisterModal
-   * Accepts an object with fields: { name, email, password, confirmPassword, phone }
-   * Returns: { success: boolean, error?: string, data?: any }
-   */
-  const register = async ({ name, email, password, phone }) => {
-    try {
-      // Create auth user and pass metadata so trigger can pick it up
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name ?? null, phone: phone ?? null } // raw_user_meta_data
-        }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // --- Submit ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setLoading(true);
+    setErrors({});
+
+    const result = await signUp(formData);
+    console.log(result)
+    if (result) {
+      onClose();
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
       });
-
-      if (error) {
-        // Known Supabase error
-        return { success: false, error: error.message || String(error) };
-      }
-
-      // At this point:
-      // - If your DB trigger exists, it will create a profiles row (server-side).
-      // - If you want to ensure a profile exists client-side immediately, upsert profile here (safe).
-      // We will attempt an upsert to ensure profile exists if trigger was not created or takes time.
-      const userId = data.user?.id ?? null;
-      if (userId) {
-        // Upsert profile WITHOUT email (email is in auth.users)
-        const { error: upsertErr } = await supabase
-          .from("profiles")
-          .upsert(
-            { id: userId, full_name: name ?? null, phone: phone ?? null },
-            { onConflict: "id" }
-          );
-        // ignore upsert errors that are benign (log them)
-        if (upsertErr) {
-          console.warn("Profile upsert warning:", upsertErr);
-        }
-      }
-
-      return { success: true, data };
-    } catch (err) {
-      console.error("register error:", err);
-      return { success: false, error: err?.message ?? String(err) };
+      
+    } else {
+      setErrors({ general:"Registration failed" });
     }
+
+    setLoading(false);
   };
 
-  const signIn = async ({ email, password }) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      return { success: true, data };
-    } catch (err) {
-      return { success: false, error: err?.message ?? String(err) };
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setUser(null);
-      setSession(null);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err?.message ?? String(err) };
-    }
-  };
-
-  // update profile helper (updates profiles table columns)
-  const updateProfile = async (profile) => {
-    try {
-      if (!user?.id) throw new Error("Not authenticated");
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(profile)
-        .eq("id", user.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return { success: true, data };
-    } catch (err) {
-      return { success: false, error: err?.message ?? String(err) };
-    }
+  const handleClose = () => {
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    });
+    setErrors({});
+    onClose();
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        loading,
-        register,
-        signIn,
-        signOut,
-        updateProfile,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Create Account</h2>
+          <button onClick={handleClose} className="p-2 rounded hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {errors.general && (
+          <div className="p-3 mb-4 text-sm text-red-600 rounded bg-red-50">
+            {errors.general}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
+          <div>
+            <label
+              htmlFor="register-name"
+              className="block mb-1 text-sm font-medium"
+            >
+              Full Name *
+            </label>
+            <input
+              id="register-name"
+              name="name"
+              type="text"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className={`w-full border rounded px-3 py-2 ${
+                errors.name ? "border-red-500" : ""
+              }`}
+              placeholder="John Doe"
+              disabled={loading}
+            />
+            {errors.name && (
+              <p className="mt-1 text-xs text-red-500">{errors.name}</p>
+            )}
+          </div>
+
+          {/* Email */}
+          <div>
+            <label
+              htmlFor="register-email"
+              className="block mb-1 text-sm font-medium"
+            >
+              Email *
+            </label>
+            <input
+              id="register-email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              className={`w-full border rounded px-3 py-2 ${
+                errors.email ? "border-red-500" : ""
+              }`}
+              placeholder="you@example.com"
+              disabled={loading}
+            />
+            {errors.email && (
+              <p className="mt-1 text-xs text-red-500">{errors.email}</p>
+            )}
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label
+              htmlFor="register-phone"
+              className="block mb-1 text-sm font-medium"
+            >
+              Phone
+            </label>
+            <input
+              id="register-phone"
+              name="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+              className="w-full px-3 py-2 border rounded"
+              placeholder="+1234567890"
+              disabled={loading}
+            />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label
+              htmlFor="register-password"
+              className="block mb-1 text-sm font-medium"
+            >
+              Password *
+            </label>
+            <input
+              id="register-password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              className={`w-full border rounded px-3 py-2 ${
+                errors.password ? "border-red-500" : ""
+              }`}
+              placeholder="••••••••"
+              disabled={loading}
+            />
+            {errors.password && (
+              <p className="mt-1 text-xs text-red-500">{errors.password}</p>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label
+              htmlFor="register-confirm-password"
+              className="block mb-1 text-sm font-medium"
+            >
+              Confirm Password *
+            </label>
+            <input
+              id="register-confirm-password"
+              name="confirmPassword"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  confirmPassword: e.target.value,
+                })
+              }
+              className={`w-full border rounded px-3 py-2 ${
+                errors.confirmPassword ? "border-red-500" : ""
+              }`}
+              placeholder="••••••••"
+              disabled={loading}
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.confirmPassword}
+              </p>
+            )}
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Creating Account..." : "Register"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-sm text-center text-gray-600">
+          Already have an account?{" "}
+          <button
+            onClick={onSwitchToLogin}
+            className="font-medium text-blue-600 hover:underline"
+          >
+            Login
+          </button>
+        </p>
+      </div>
+    </div>
   );
 };

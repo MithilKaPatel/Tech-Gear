@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../lib/supabase";
 
 export const AuthContext = createContext();
 
@@ -53,14 +53,14 @@ export const AuthProvider = ({ children }) => {
 
   // signUp: create auth user; do NOT insert `email` into profiles.
   // If you want a profile row client-side (instead of trigger), we'll insert only id + metadata (no email).
-  const signUp = async ({ email, password, full_name = null, avatar_url = null }) => {
+  const signUp = async ({ email, password, name = null, avatar_url = null }) => {
     // sign up via supabase auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         // place metadata in raw_user_meta_data so the server trigger can read them:
-        data: { full_name, avatar_url },
+        data: { name, avatar_url },
       },
     });
     if (error) throw error;
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
         await supabase
           .from("profiles")
           .upsert(
-            { id: userId, full_name: full_name ?? null, avatar_url: avatar_url ?? null },
+            { id: userId, name: name ?? null, avatar_url: avatar_url ?? null },
             { onConflict: "id", ignoreDuplicates: false }
           );
       } catch (err) {
