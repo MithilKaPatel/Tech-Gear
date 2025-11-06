@@ -71,11 +71,9 @@ export const Header = () => {
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-2 p-2 text-gray-700 transition-colors hover:text-blue-600"
                   >
-                    <img
-                      src={user?.avatar_url}
-                      alt={user?.full_name}
-                      className="w-8 h-8 rounded-full"
-                    />
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                      {user?.email?.charAt(0).toUpperCase()}
+                    </div>
                   </button>
 
                   {showUserMenu && (
@@ -86,7 +84,7 @@ export const Header = () => {
                       />
                       <div className="absolute right-0 z-50 w-48 py-2 mt-2 bg-white border rounded-lg shadow-lg">
                         <div className="px-4 py-2 border-b">
-                          <p className="text-sm font-semibold">{user?.full_name}</p>
+                          <p className="text-sm font-semibold">{user?.user_metadata?.name || user?.email}</p>
                           <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
 
