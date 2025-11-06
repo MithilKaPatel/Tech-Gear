@@ -21,13 +21,12 @@ export const LoginModal = ({ isOpen, onClose, onSwitchToRegister }) => {
       return;
     }
 
-    const result = await signIn(formData);
-    console.log(result)
-    if (result.success) {
+    try {
+      await signIn(formData);
       onClose();
       setFormData({ email: '', password: '' });
-    } else {
-      setError(result.error || 'Invalid email or password');
+    } catch (err) {
+      setError(err.message || 'Invalid email or password');
     }
 
     setLoading(false);

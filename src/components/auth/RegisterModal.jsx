@@ -42,9 +42,8 @@ export const RegisterModal = ({ isOpen, onClose, onSwitchToLogin }) => {
     setLoading(true);
     setErrors({});
 
-    const result = await signUp(formData);
-    console.log(result)
-    if (result) {
+    try {
+      await signUp(formData);
       onClose();
       setFormData({
         name: "",
@@ -53,9 +52,8 @@ export const RegisterModal = ({ isOpen, onClose, onSwitchToLogin }) => {
         password: "",
         confirmPassword: "",
       });
-      
-    } else {
-      setErrors({ general:"Registration failed" });
+    } catch (err) {
+      setErrors({ general: err.message || "Registration failed" });
     }
 
     setLoading(false);
